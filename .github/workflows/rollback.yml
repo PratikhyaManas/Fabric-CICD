@@ -1,0 +1,47 @@
+name: Fabric Rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_env:
+        description: "Target environment to restore"
+        required: true
+        default: "test"
+        type: choice
+        options:
+          - test
+          - prod
+      rollback_manifest:
+        description: "Path to rollback manifest JSON in repository"
+        required: true
+        default: "artifacts/rollback/dev-to-test-rollback.json"
+        type: string
+
+jobs:
+  rollback:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.target_env }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run rollback
+        env:
+          FABRIC_TENANT_ID: ${{ secrets.FABRIC_TENANT_ID }}
+          FABRIC_CLIENT_ID: ${{ secrets.FABRIC_CLIENT_ID }}
+          FABRIC_CLIENT_SECRET: ${{ secrets.FABRIC_CLIENT_SECRET }}
+        run: |
+          python -m fabric_cicd.cli rollback \
+            --target-config configs/environments/${{ github.event.inputs.target_env }}.yaml \
+            --manifest ${{ github.event.inputs.rollback_manifest }}

@@ -1,0 +1,40 @@
+name: dev
+workspace_id: "<dev-workspace-guid>"
+capacity_id: "<dev-capacity-guid>"
+backup_workspace_id: "<dev-backup-workspace-guid>"
+items:
+  variablelib_runtime:
+    name: "RuntimeVariables"
+    type: "VariableLibrary"
+  environment_spark:
+    name: "SparkRuntimeEnvironment"
+    type: "Environment"
+    depends_on: ["variablelib_runtime"]
+  lakehouse_sales:
+    name: "SalesLakehouse"
+    type: "Lakehouse"
+    depends_on: ["environment_spark"]
+  notebook_ingest:
+    name: "NotebookIngest"
+    type: "Notebook"
+    depends_on: ["lakehouse_sales", "environment_spark"]
+  dataflow_curated_sales:
+    name: "CuratedSalesDataflow"
+    type: "Dataflow"
+    depends_on: ["lakehouse_sales"]
+  pipeline_ingestion:
+    name: "IngestionPipeline"
+    type: "Pipeline"
+    depends_on: ["notebook_ingest", "dataflow_curated_sales"]
+  copyjob_ops_snapshot:
+    name: "OpsSnapshotCopyJob"
+    type: "CopyJob"
+    depends_on: ["pipeline_ingestion"]
+  semantic_sales:
+    name: "SalesSemanticModel"
+    type: "SemanticModel"
+    depends_on: ["pipeline_ingestion", "copyjob_ops_snapshot"]
+  report_sales:
+    name: "SalesReport"
+    type: "Report"
+    depends_on: ["semantic_sales"]
