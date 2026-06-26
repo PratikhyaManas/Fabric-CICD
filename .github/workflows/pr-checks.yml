@@ -5,8 +5,11 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+
 jobs:
-  validate:
+  quality-and-security:
     runs-on: ubuntu-latest
 
     steps:
@@ -22,10 +25,41 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+          pip install .[dev]
 
       - name: Syntax checks
+        run: python -m compileall fabric_cicd
+
+      - name: Lint
+        run: ruff check .
+
+      - name: Type checks
+        run: mypy fabric_cicd
+
+      - name: Unit tests
+        run: pytest
+
+      - name: Security static analysis
+        run: bandit -q -c pyproject.toml -r fabric_cicd
+
+      - name: Secret scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Dependency vulnerability audit
+        run: pip-audit --progress-spinner off
+
+      - name: Generate SBOM
         run: |
-          python -m compileall fabric_cicd
+          mkdir -p artifacts/sbom
+          cyclonedx-py environment --output-format json --output-file artifacts/sbom/sbom.json
+
+      - name: Upload SBOM
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-pr-${{ github.run_id }}
+          path: artifacts/sbom/sbom.json
 
       - name: Dry enterprise preflight (dev -> test)
         env:

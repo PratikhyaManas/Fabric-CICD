@@ -60,6 +60,7 @@ def build_parser() -> argparse.ArgumentParser:
     preflight_p = sub.add_parser("preflight", parents=[common], help="Run lint + remote validation checks")
     preflight_p.add_argument("--source-config", required=True, help="Path to source environment YAML")
     preflight_p.add_argument("--target-config", required=True, help="Path to target environment YAML")
+    preflight_p.add_argument("--policy-file", required=True, help="Path to enterprise policy YAML")
 
     ent_preflight_p = sub.add_parser(
         "enterprise-preflight",
@@ -146,6 +147,7 @@ def main() -> None:
         preflight(
             source_env_config_file=args.source_config,
             target_env_config_file=args.target_config,
+            policy_file=args.policy_file,
             tenant_id=args.tenant_id,
             client_id=args.client_id,
             client_secret=args.client_secret,

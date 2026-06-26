@@ -1,16 +1,16 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
 import json
-from pathlib import Path
 import re
+from datetime import UTC, datetime
+from pathlib import Path
 
 from fabric_cicd.fabric_api import FabricApiClient
 from fabric_cicd.models import (
+    SUPPORTED_ARTIFACT_TYPES,
     ArtifactConfig,
     EnvironmentConfig,
     RollbackEntry,
-    SUPPORTED_ARTIFACT_TYPES,
     ValidationResult,
 )
 
@@ -96,6 +96,8 @@ def lint_environment_config(environment_cfg: EnvironmentConfig) -> ValidationRes
         result.errors.append("workspace_id is required.")
     if not environment_cfg.capacity_id:
         result.errors.append("capacity_id is required.")
+    if not environment_cfg.backup_workspace_id:
+        result.errors.append("backup_workspace_id is required for safe rollback support.")
     if not environment_cfg.items:
         result.errors.append("At least one artifact under items is required.")
 
@@ -106,6 +108,10 @@ def lint_environment_config(environment_cfg: EnvironmentConfig) -> ValidationRes
             )
         if not artifact.name:
             result.errors.append(f"Artifact '{logical_name}' must define a non-empty name.")
+        if not artifact.required:
+            result.errors.append(
+                f"Artifact '{logical_name}' must be required to avoid accidental deployment gaps."
+            )
         if logical_name in artifact.depends_on:
             result.errors.append(f"Artifact '{logical_name}' cannot depend on itself.")
         for dep in artifact.depends_on:
@@ -132,7 +138,7 @@ def apply_enterprise_policy(
     if policy.freeze:
         result.errors.append("Deployment freeze is enabled by enterprise policy.")
 
-    now_hour = datetime.now(timezone.utc).hour
+    now_hour = datetime.now(UTC).hour
     start = policy.deployment_window.start_hour_utc
     end = policy.deployment_window.end_hour_utc
     if not (start <= now_hour < end):
@@ -144,6 +150,10 @@ def apply_enterprise_policy(
         result.warnings.append(
             f"Target '{target_environment_name}' is protected; enforce reviewer approvals in CI environment rules."
         )
+        if policy.require_backup_workspace_for_protected and not environment_cfg.backup_workspace_id:
+            result.errors.append(
+                f"Target '{target_environment_name}' requires backup_workspace_id by policy."
+            )
 
     configured_types = {a.artifact_type for a in environment_cfg.items.values()}
     if policy.allowed_artifact_types:
@@ -158,6 +168,25 @@ def apply_enterprise_policy(
             result.errors.append(f"Missing required artifact type '{req_type}' in configuration.")
 
     for logical_name, artifact in environment_cfg.items.items():
+        if (
+            target_environment_name in policy.protected_environments
+            and policy.disallow_target_name_override_in_protected
+            and artifact.target_name
+            and artifact.target_name != artifact.name
+        ):
+            result.errors.append(
+                f"Artifact '{logical_name}' uses target_name override in protected environment '{target_environment_name}', which is disallowed."
+            )
+
+        if (
+            target_environment_name in policy.protected_environments
+            and policy.require_all_artifacts_required_in_protected
+            and not artifact.required
+        ):
+            result.errors.append(
+                f"Artifact '{logical_name}' is optional in protected environment '{target_environment_name}', which is disallowed."
+            )
+
         pattern = policy.name_patterns.get(artifact.artifact_type)
         if not pattern:
             continue
@@ -197,7 +226,7 @@ def write_release_evidence(
     out_path: str | Path,
 ) -> None:
     payload = {
-        "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+        "timestamp_utc": datetime.now(UTC).isoformat(),
         "source_environment": source_cfg.name,
         "target_environment": target_cfg.name,
         "artifacts": [
@@ -449,7 +478,7 @@ def promote_with_validation(
     evidence_path = (
         Path("artifacts")
         / "releases"
-        / f"{source_cfg.name}-to-{target_cfg.name}-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}.json"
+        / f"{source_cfg.name}-to-{target_cfg.name}-{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}.json"
     )
     write_release_evidence(source_cfg, target_cfg, artifacts, evidence_path)
     print(f"Release evidence written to {evidence_path}")

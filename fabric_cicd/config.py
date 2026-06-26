@@ -1,9 +1,15 @@
 from __future__ import annotations
 
 from pathlib import Path
+
 import yaml
 
-from fabric_cicd.models import ArtifactConfig, DeploymentWindow, EnterprisePolicy, EnvironmentConfig
+from fabric_cicd.models import (
+    ArtifactConfig,
+    DeploymentWindow,
+    EnterprisePolicy,
+    EnvironmentConfig,
+)
 
 
 def _coerce_artifacts(raw_items: dict) -> dict[str, ArtifactConfig]:
@@ -59,4 +65,13 @@ def load_enterprise_policy(path: str | Path) -> EnterprisePolicy:
         protected_environments=list(raw.get("protected_environments", ["prod"])),
         freeze=bool(raw.get("freeze", False)),
         deployment_window=deployment_window,
+        require_backup_workspace_for_protected=bool(
+            raw.get("require_backup_workspace_for_protected", True)
+        ),
+        disallow_target_name_override_in_protected=bool(
+            raw.get("disallow_target_name_override_in_protected", True)
+        ),
+        require_all_artifacts_required_in_protected=bool(
+            raw.get("require_all_artifacts_required_in_protected", True)
+        ),
     )

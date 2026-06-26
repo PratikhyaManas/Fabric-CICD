@@ -25,6 +25,9 @@ name_patterns:
 protected_environments:
   - prod
 freeze: false
+require_backup_workspace_for_protected: true
+disallow_target_name_override_in_protected: true
+require_all_artifacts_required_in_protected: true
 deployment_window:
   start_hour_utc: 5
   end_hour_utc: 22

@@ -118,21 +118,30 @@ def lint_config(env_config_file: str) -> None:
 def preflight(
     source_env_config_file: str,
     target_env_config_file: str,
+    policy_file: str,
     tenant_id: str,
     client_id: str,
     client_secret: str,
 ) -> None:
     source_cfg = load_environment_config(source_env_config_file)
     target_cfg = load_environment_config(target_env_config_file)
+    policy = load_enterprise_policy(policy_file)
     client = make_client(tenant_id, client_id, client_secret)
 
-    result = run_preflight_checks(client, source_cfg, target_cfg)
-    for warning in result.warnings:
+    base_result = run_preflight_checks(client, source_cfg, target_cfg)
+    policy_result = apply_enterprise_policy(source_cfg, target_cfg.name, policy)
+
+    merged_errors = list(base_result.errors) + list(policy_result.errors)
+    merged_warnings = list(base_result.warnings) + list(policy_result.warnings)
+
+    for warning in merged_warnings:
         print(f"[WARN] {warning}")
-    for error in result.errors:
+    for error in merged_errors:
         print(f"[ERROR] {error}")
 
-    result.ensure_valid()
+    if merged_errors:
+        raise RuntimeError("Preflight checks failed.")
+
     print("Preflight checks passed.")
 
 

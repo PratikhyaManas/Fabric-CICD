@@ -13,6 +13,18 @@ dependencies = [
   "requests>=2.32.3"
 ]
 
+[project.optional-dependencies]
+dev = [
+  "bandit[toml]>=1.7.9",
+  "cyclonedx-bom>=4.1.6",
+  "mypy>=1.11.2",
+  "pip-audit>=2.7.3",
+  "pre-commit>=3.8.0",
+  "pytest>=8.3.2",
+  "pytest-cov>=5.0.0",
+  "ruff>=0.6.9",
+]
+
 [project.scripts]
 fabric-cicd = "fabric_cicd.cli:main"
 
@@ -22,3 +34,26 @@ package-dir = {"" = "."}
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["fabric_cicd*"]
+
+[tool.pytest.ini_options]
+addopts = "-q --cov=fabric_cicd --cov-report=term-missing --cov-fail-under=25"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+ignore_missing_imports = true
+
+[tool.bandit]
+exclude_dirs = ["tests"]
+skips = ["B101"]

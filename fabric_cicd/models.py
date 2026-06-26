@@ -85,3 +85,6 @@ class EnterprisePolicy:
     protected_environments: list[str] = field(default_factory=lambda: ["prod"])
     freeze: bool = False
     deployment_window: DeploymentWindow = field(default_factory=DeploymentWindow)
+    require_backup_workspace_for_protected: bool = True
+    disallow_target_name_override_in_protected: bool = True
+    require_all_artifacts_required_in_protected: bool = True
