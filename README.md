@@ -11,17 +11,36 @@ Code-first starter for Microsoft Fabric CI/CD using Python and GitHub Actions.
 - Validation gates (source existence, dependency wiring, target compatibility checks)
 - Automatic rollback manifest generation before overwrite operations
 - PR checks + environment-gated deployment + explicit rollback workflow
+- Enterprise policy checks (artifact allowlist, required types, naming rules, freeze/deployment window)
+- Release evidence manifest per deployment for auditability
+
+## Choose one delivery path
+
+This repository contains two deployment implementations:
+
+- GitHub Actions path (`.github/workflows/*`) based on the local `fabric_cicd` Python package.
+- Azure DevOps path (`.pipelines/*` + `.deploy/deploy_fabric_workspace.py`) based on the external `fabric-cicd` package.
+
+To reduce operational complexity, choose one path as primary for production and keep the other for reference or migration.
 
 ## Project structure
 
 - `fabric_cicd/`: Python package and CLI
+- `.deploy/deploy_fabric_workspace.py`: `fabric-cicd` deployment entry script (ADO)
+- `.pipelines/deploy_workspace_uat.yml`: Azure DevOps UAT deployment pipeline
+- `.pipelines/deploy_workspace_prod.yml`: Azure DevOps PROD deployment pipeline
 - `configs/environments/`: environment YAMLs
 - `scripts/`: local PowerShell helper scripts
 - `.github/workflows/fabric-cicd.yml`: GitHub Actions pipeline
 - `.github/workflows/pr-checks.yml`: pull request validation checks
 - `.github/workflows/rollback.yml`: manual rollback pipeline
+- `workspace/engineering/project_one/`: engineering Fabric items + `parameter.yml`
+- `workspace/presentation/project_one/`: presentation Fabric items
+- `docs/enterprise-branching-and-promotion.md`: enterprise branch and promotion guidance
+- `configs/enterprise-policy.yaml`: enterprise governance policy file
 - `artifacts/exported/`: generated exports
 - `artifacts/rollback/`: generated rollback manifests
+- `artifacts/releases/`: generated release evidence manifests
 
 ## Prerequisites
 
@@ -174,6 +193,12 @@ Run full preflight (lint + remote source/target checks):
 python -m fabric_cicd.cli preflight --source-config configs/environments/dev.yaml --target-config configs/environments/test.yaml
 ```
 
+Run enterprise preflight (includes policy checks):
+
+```powershell
+python -m fabric_cicd.cli enterprise-preflight --source-config configs/environments/dev.yaml --target-config configs/environments/test.yaml --policy-file configs/enterprise-policy.yaml
+```
+
 Render dependency graph (Mermaid):
 
 ```powershell
@@ -207,11 +232,34 @@ Or use helper scripts:
 4. Run workflow `Fabric CI-CD` via `workflow_dispatch`.
 5. Choose `source_env` and `target_env`.
 
+## Azure DevOps enterprise deployment (article-aligned)
+
+This repo now also includes an Azure DevOps + `fabric-cicd` deployment path, similar to the referenced enterprise pattern.
+
+- UAT pipeline: `.pipelines/deploy_workspace_uat.yml`
+- PROD pipeline: `.pipelines/deploy_workspace_prod.yml`
+- Shared pipeline template: `.pipelines/deploy_workspace_template.yml`
+- Deployment script: `.deploy/deploy_fabric_workspace.py`
+- Project-level parameterization: `workspace/engineering/project_one/parameter.yml`
+
+Expected ADO variable group variables:
+- `workspace_guid`
+- `fabric_vl_vset_active` (for example: `UAT`, `PROD`)
+- `repo_project_directory` (for example: `project_one`)
+- `fabric_item_type_inscope` (for example: `VariableLibrary,Environment,Notebook,DataPipeline,Lakehouse,CopyJob,Dataflow,SemanticModel,Report`)
+- `azure_service_connection`
+
+The script uses `AzureCliCredential`, so deployment auth comes from the `AzureCLI@2` task service connection rather than hardcoded secrets.
+
+Branching/promotion reference:
+- See `docs/enterprise-branching-and-promotion.md` for feature/dev/uat/main, squash-merge rule, and cherry-pick promotion branches.
+
 ## Pipeline controls included
 
 - `PR Checks` workflow validates Python syntax + dev->test compatibility on pull requests to `main`.
-- `Fabric CI-CD` workflow enforces validation before promote and binds jobs to GitHub environments for approvals.
+- `Fabric CI-CD` workflow enforces enterprise preflight before promote and binds jobs to GitHub environments for approvals.
 - `Fabric Rollback` workflow allows manual restore by applying a rollback manifest.
+- Promote job uploads release evidence JSON for audit/compliance trails.
 
 ## Advanced deployment features
 
@@ -219,6 +267,8 @@ Or use helper scripts:
 - Dependency graph output: print artifact dependency graph as `json` or `mermaid`.
 - Config linter: validates schema, supported artifact types, unknown dependencies, and cycle detection.
 - Preflight command: runs lint + remote source/target compatibility checks before promote.
+- Enterprise preflight: adds policy-based guardrails (naming, required/allowed types, freeze, deployment window).
+- Release evidence output: records deployed artifacts and timestamp to `artifacts/releases/`.
 
 ## Important notes
 

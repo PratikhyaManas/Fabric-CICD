@@ -1,0 +1,32 @@
+find_replace:
+  - find_value: "your-dev-lakehouse-id"
+    replace_value:
+      UAT: "your-uat-lakehouse-id"
+      PROD: "your-prod-lakehouse-id"
+
+key_value_replace:
+  - find_key: $.variables[?(@.name=="Environment")].value
+    replace_value:
+      UAT: "UAT"
+      PROD: "PROD"
+
+spark_pool:
+  - instance_pool_id: "your-dev-pool-instance-id"
+    replace_value:
+      UAT:
+        type: "Capacity"
+        name: "UAT-Pool-Name"
+      PROD:
+        type: "Capacity"
+        name: "PROD-Pool-Name"
+
+semantic_model_binding:
+  default:
+    connection_id:
+      UAT: "your-uat-connection-id"
+      PROD: "your-prod-connection-id"
+  models:
+    - semantic_model_name: "Sales Semantic Model"
+      connection_id:
+        UAT: "your-uat-connection-id"
+        PROD: "your-prod-connection-id"

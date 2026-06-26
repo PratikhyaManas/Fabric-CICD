@@ -69,3 +69,19 @@ class ValidationResult:
     def ensure_valid(self) -> None:
         if self.errors:
             raise RuntimeError("Validation failed:\n- " + "\n- ".join(self.errors))
+
+
+@dataclass
+class DeploymentWindow:
+    start_hour_utc: int = 0
+    end_hour_utc: int = 24
+
+
+@dataclass
+class EnterprisePolicy:
+    allowed_artifact_types: list[str] = field(default_factory=list)
+    required_artifact_types: list[str] = field(default_factory=list)
+    name_patterns: dict[str, str] = field(default_factory=dict)
+    protected_environments: list[str] = field(default_factory=lambda: ["prod"])
+    freeze: bool = False
+    deployment_window: DeploymentWindow = field(default_factory=DeploymentWindow)

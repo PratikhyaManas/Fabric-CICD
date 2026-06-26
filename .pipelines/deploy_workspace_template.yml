@@ -1,0 +1,59 @@
+parameters:
+  - name: variableGroup
+    type: string
+
+trigger: none
+
+variables:
+  - group: ${{ parameters.variableGroup }}
+
+stages:
+  - stage: Build
+    jobs:
+      - job: Build
+        pool:
+          vmImage: ubuntu-latest
+        steps:
+          - checkout: self
+          - task: PublishPipelineArtifact@1
+            inputs:
+              targetPath: "$(System.DefaultWorkingDirectory)"
+              artifact: build
+
+  - stage: Release
+    dependsOn: Build
+    jobs:
+      - job: Release
+        pool:
+          vmImage: ubuntu-latest
+        steps:
+          - checkout: none
+          - task: DownloadPipelineArtifact@2
+            inputs:
+              buildType: current
+              artifactName: build
+              targetPath: "$(Pipeline.Workspace)/build"
+
+          - task: UsePythonVersion@0
+            inputs:
+              versionSpec: "3.11"
+
+          - script: |
+              python -m pip install --upgrade pip
+              python -m pip install --upgrade fabric-cicd azure-identity
+              python -m pip show fabric-cicd
+              python -m pip show azure-identity
+            displayName: Install fabric-cicd and azure-identity
+
+          - task: AzureCLI@2
+            displayName: Deploy Fabric Workspace
+            inputs:
+              azureSubscription: "$(azure_service_connection)"
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                python -u "$(Pipeline.Workspace)/build/.deploy/deploy_fabric_workspace.py" \
+                  --workspace_id "$(workspace_guid)" \
+                  --environment "$(fabric_vl_vset_active)" \
+                  --item_type_in_scope "$(fabric_item_type_inscope)" \
+                  --repository_directory "$(Pipeline.Workspace)/build/workspace/engineering/$(repo_project_directory)"

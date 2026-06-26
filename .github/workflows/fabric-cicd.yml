@@ -54,9 +54,10 @@ jobs:
           FABRIC_CLIENT_ID: ${{ secrets.FABRIC_CLIENT_ID }}
           FABRIC_CLIENT_SECRET: ${{ secrets.FABRIC_CLIENT_SECRET }}
         run: |
-          python -m fabric_cicd.cli validate \
+          python -m fabric_cicd.cli enterprise-preflight \
             --source-config configs/environments/${{ github.event.inputs.source_env }}.yaml \
-            --target-config configs/environments/${{ github.event.inputs.target_env }}.yaml
+            --target-config configs/environments/${{ github.event.inputs.target_env }}.yaml \
+            --policy-file configs/enterprise-policy.yaml
 
   promote:
     runs-on: ubuntu-latest
@@ -92,3 +93,9 @@ jobs:
         with:
           name: rollback-manifest-${{ github.run_id }}
           path: artifacts/rollback/*.json
+
+      - name: Upload release evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-evidence-${{ github.run_id }}
+          path: artifacts/releases/*.json

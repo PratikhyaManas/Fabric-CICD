@@ -1,0 +1,30 @@
+allowed_artifact_types:
+  - VariableLibrary
+  - Environment
+  - Lakehouse
+  - Notebook
+  - Pipeline
+  - CopyJob
+  - Dataflow
+required_artifact_types:
+  - VariableLibrary
+  - Environment
+  - Lakehouse
+  - Notebook
+  - Pipeline
+  - CopyJob
+  - Dataflow
+name_patterns:
+  VariableLibrary: "^[A-Z][A-Za-z0-9]+Variables$"
+  Environment: "^[A-Z][A-Za-z0-9]+Environment$"
+  Lakehouse: "^[A-Z][A-Za-z0-9]+Lakehouse$"
+  Notebook: "^[A-Z][A-Za-z0-9]+Notebook|Notebook[A-Za-z0-9]+$"
+  Pipeline: "^[A-Z][A-Za-z0-9]+Pipeline$"
+  CopyJob: "^[A-Z][A-Za-z0-9]+CopyJob$"
+  Dataflow: "^[A-Z][A-Za-z0-9]+Dataflow$"
+protected_environments:
+  - prod
+freeze: false
+deployment_window:
+  start_hour_utc: 5
+  end_hour_utc: 22

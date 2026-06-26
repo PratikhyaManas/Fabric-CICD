@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 import yaml
 
-from fabric_cicd.models import ArtifactConfig, EnvironmentConfig
+from fabric_cicd.models import ArtifactConfig, DeploymentWindow, EnterprisePolicy, EnvironmentConfig
 
 
 def _coerce_artifacts(raw_items: dict) -> dict[str, ArtifactConfig]:
@@ -39,4 +39,24 @@ def load_environment_config(path: str | Path) -> EnvironmentConfig:
         capacity_id=raw["capacity_id"],
         backup_workspace_id=raw.get("backup_workspace_id"),
         items=_coerce_artifacts(raw.get("items", {})),
+    )
+
+
+def load_enterprise_policy(path: str | Path) -> EnterprisePolicy:
+    policy_path = Path(path)
+    raw = yaml.safe_load(policy_path.read_text(encoding="utf-8"))
+
+    window_raw = raw.get("deployment_window", {})
+    deployment_window = DeploymentWindow(
+        start_hour_utc=int(window_raw.get("start_hour_utc", 0)),
+        end_hour_utc=int(window_raw.get("end_hour_utc", 24)),
+    )
+
+    return EnterprisePolicy(
+        allowed_artifact_types=list(raw.get("allowed_artifact_types", [])),
+        required_artifact_types=list(raw.get("required_artifact_types", [])),
+        name_patterns=dict(raw.get("name_patterns", {})),
+        protected_environments=list(raw.get("protected_environments", ["prod"])),
+        freeze=bool(raw.get("freeze", False)),
+        deployment_window=deployment_window,
     )

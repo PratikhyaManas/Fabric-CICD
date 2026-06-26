@@ -27,12 +27,13 @@ jobs:
         run: |
           python -m compileall fabric_cicd
 
-      - name: Dry validation (dev -> test)
+      - name: Dry enterprise preflight (dev -> test)
         env:
           FABRIC_TENANT_ID: ${{ secrets.FABRIC_TENANT_ID }}
           FABRIC_CLIENT_ID: ${{ secrets.FABRIC_CLIENT_ID }}
           FABRIC_CLIENT_SECRET: ${{ secrets.FABRIC_CLIENT_SECRET }}
         run: |
-          python -m fabric_cicd.cli validate \
+          python -m fabric_cicd.cli enterprise-preflight \
             --source-config configs/environments/dev.yaml \
-            --target-config configs/environments/test.yaml
+            --target-config configs/environments/test.yaml \
+            --policy-file configs/enterprise-policy.yaml

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 import json
 from pathlib import Path
+import re
 
 from fabric_cicd.fabric_api import FabricApiClient
 from fabric_cicd.models import (
@@ -120,6 +122,53 @@ def lint_environment_config(environment_cfg: EnvironmentConfig) -> ValidationRes
     return result
 
 
+def apply_enterprise_policy(
+    environment_cfg: EnvironmentConfig,
+    target_environment_name: str,
+    policy,
+) -> ValidationResult:
+    result = ValidationResult()
+
+    if policy.freeze:
+        result.errors.append("Deployment freeze is enabled by enterprise policy.")
+
+    now_hour = datetime.now(timezone.utc).hour
+    start = policy.deployment_window.start_hour_utc
+    end = policy.deployment_window.end_hour_utc
+    if not (start <= now_hour < end):
+        result.errors.append(
+            f"Current UTC hour {now_hour} is outside allowed deployment window [{start}, {end})."
+        )
+
+    if target_environment_name in policy.protected_environments:
+        result.warnings.append(
+            f"Target '{target_environment_name}' is protected; enforce reviewer approvals in CI environment rules."
+        )
+
+    configured_types = {a.artifact_type for a in environment_cfg.items.values()}
+    if policy.allowed_artifact_types:
+        disallowed = configured_types - set(policy.allowed_artifact_types)
+        if disallowed:
+            result.errors.append(
+                "Disallowed artifact types in configuration: " + ", ".join(sorted(disallowed))
+            )
+
+    for req_type in policy.required_artifact_types:
+        if req_type not in configured_types:
+            result.errors.append(f"Missing required artifact type '{req_type}' in configuration.")
+
+    for logical_name, artifact in environment_cfg.items.items():
+        pattern = policy.name_patterns.get(artifact.artifact_type)
+        if not pattern:
+            continue
+        if not re.match(pattern, artifact.name):
+            result.errors.append(
+                f"Artifact '{logical_name}' ({artifact.artifact_type}) with name '{artifact.name}' does not match policy pattern '{pattern}'."
+            )
+
+    return result
+
+
 def run_preflight_checks(
     client: FabricApiClient,
     source_cfg: EnvironmentConfig,
@@ -139,6 +188,31 @@ def run_preflight_checks(
     merged.errors.extend(promote_validation.errors)
     merged.warnings.extend(promote_validation.warnings)
     return merged
+
+
+def write_release_evidence(
+    source_cfg: EnvironmentConfig,
+    target_cfg: EnvironmentConfig,
+    deployed_artifacts: list[ArtifactConfig],
+    out_path: str | Path,
+) -> None:
+    payload = {
+        "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+        "source_environment": source_cfg.name,
+        "target_environment": target_cfg.name,
+        "artifacts": [
+            {
+                "logical_name": a.logical_name,
+                "name": a.name,
+                "type": a.artifact_type,
+                "target_name": a.target_name or a.name,
+            }
+            for a in deployed_artifacts
+        ],
+    }
+    path = Path(out_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
 
 def validate_promotion(
@@ -371,6 +445,14 @@ def promote_with_validation(
     rollback_payload = [entry.__dict__ for entry in manifest_entries]
     rollback_path.write_text(json.dumps(rollback_payload, indent=2), encoding="utf-8")
     print(f"Rollback manifest written to {rollback_path}")
+
+    evidence_path = (
+        Path("artifacts")
+        / "releases"
+        / f"{source_cfg.name}-to-{target_cfg.name}-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}.json"
+    )
+    write_release_evidence(source_cfg, target_cfg, artifacts, evidence_path)
+    print(f"Release evidence written to {evidence_path}")
 
 
 def run_rollback(

@@ -1,0 +1,4 @@
+extends:
+  template: deploy_workspace_template.yml
+  parameters:
+    variableGroup: Fabric_Deployment_Group_PROD

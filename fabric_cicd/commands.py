@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fabric_cicd.config import load_environment_config
+from fabric_cicd.config import load_enterprise_policy, load_environment_config
 from fabric_cicd.deployment import (
+    apply_enterprise_policy,
     build_dependency_graph,
     lint_environment_config,
     promote_with_validation,
@@ -133,6 +134,36 @@ def preflight(
 
     result.ensure_valid()
     print("Preflight checks passed.")
+
+
+def enterprise_preflight(
+    source_env_config_file: str,
+    target_env_config_file: str,
+    policy_file: str,
+    tenant_id: str,
+    client_id: str,
+    client_secret: str,
+) -> None:
+    source_cfg = load_environment_config(source_env_config_file)
+    target_cfg = load_environment_config(target_env_config_file)
+    policy = load_enterprise_policy(policy_file)
+    client = make_client(tenant_id, client_id, client_secret)
+
+    base_result = run_preflight_checks(client, source_cfg, target_cfg)
+    policy_result = apply_enterprise_policy(source_cfg, target_cfg.name, policy)
+
+    merged_errors = list(base_result.errors) + list(policy_result.errors)
+    merged_warnings = list(base_result.warnings) + list(policy_result.warnings)
+
+    for warning in merged_warnings:
+        print(f"[WARN] {warning}")
+    for error in merged_errors:
+        print(f"[ERROR] {error}")
+
+    if merged_errors:
+        raise RuntimeError("Enterprise preflight failed.")
+
+    print("Enterprise preflight checks passed.")
 
 
 def graph(env_config_file: str, format_name: str) -> None:
